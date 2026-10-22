@@ -86,6 +86,19 @@
       # available.
       pythons = builtins.map (pyVer: pkgs.${pyVer}) pythonVersions;
 
+      # cacert :: derivation
+      #
+      # eMudhra CA key compromise (Oct 2026): nixpkgs' cacert 3.131.1 drops
+      # these roots, but this flake pins the EOL nixpkgs-24.11, which will
+      # never ship 3.131.1 -- the blacklist override below is the only way
+      # this branch drops them. The version guard is kept anyway, in case a
+      # future override of the `nixpkgs` input ever lands a newer cacert.
+      cacert =
+        if pkgs.lib.versionAtLeast pkgs.cacert.version "3.131.1" then pkgs.cacert
+        else pkgs.cacert.override {
+          blacklist = [ "emSign ECC Root CA - G3" "emSign ECC Root CA - C3" "emSign Root CA - C1" ];
+        };
+
       # packageName :: string -> string
       #
       # Construct the Tahoe-LAFS package name for the given Python runtime.
@@ -184,6 +197,8 @@
               program =
                 writeScript "tahoe"
                   ''
+                    export SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
+                    export NIX_SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
                     ${makeRuntimeEnv' pyVersion}/bin/tahoe "$@"
                   '';
             };
